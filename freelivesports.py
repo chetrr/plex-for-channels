@@ -92,28 +92,27 @@ class Client:
                 for row in reader:
                     tmsid_dict[row['id']] = row
         else:
-            print(f"[INFO - - {self.client_name.upper()}] Opening TMSID via URL")
+            print(f"[INFO - {self.client_name.upper()}] Opening TMSID via URL")
+            response = None
             session = requests.Session()
             try:
-                # print(f'[INFO - {self.client_name.upper()}] Call {local_client_name} Genre API')
                 response = session.get(tmsid_url, timeout=300)
             except requests.ConnectionError as e:
                 error = f"Connection Error. {str(e)}"
                 print(f'[ERROR - {self.client_name.upper()}] {error}')
                 print(f'[ERROR - {self.client_name.upper()}] Unable to access TMSID via {tmsid_url}') 
             finally:
-                # print(f'[INFO - {self.client_name.upper()}] Close {local_client_name} Genre API session')
                 session.close()
                 del session
                 gc.collect()
 
             # Check if request was successful
-            if response.status_code == 200:
+            if response is not None and response.status_code == 200:
                 # Read in the CSV data
                 reader = csv.DictReader(response.text.splitlines())
                 for row in reader:
                     tmsid_dict[row['id']] = row
-            else:
+            elif response is not None:
                 print(f'[ERROR - {self.client_name.upper()}] {response.status_code}: Unable to access TMSID Data.') 
 
         filtered_tmsid = {k: v for k, v in tmsid_dict.items() if v.get("tmsid")}
@@ -139,7 +138,7 @@ class Client:
 
         return listing
 
-    def channels(self):
+    def channels(self, args=None):
         error = None
         sessionAt = self.sessionAt
         session_expires_in = self.session_expires_in
@@ -342,10 +341,10 @@ class Client:
                 if file.is_file():
                     try:
                         file.unlink()
-                    except:
+                    except Exception:
                         print(f"[ERROR - {self.client_name.upper()}] Unable to delete {file}")
                     else:
-                        print(f"[ERROR - {self.client_name.upper()}] {file} Deleted")
+                        print(f"[INFO - {self.client_name.upper()}] {file} Deleted")
 
         self.epg()
 

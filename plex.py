@@ -76,7 +76,7 @@ class Client:
                 region, ip_address = values  # Extract key-value pair
                 parsed_data = {region.strip(): ip_address.strip()}  # Convert to dictionary
         except Exception:
-            print('[ERROR - {self.client_name.upper()}] Invalid format for newregion')
+            print(f'[ERROR - {self.client_name.upper()}] Invalid format for newregion')
 
         if parsed_data:
             local_x_forward = self.x_forward.copy()
@@ -117,7 +117,7 @@ class Client:
         try:
             # Read and parse JSON file
             device_id = json.loads(file_path.read_text())
-        except:
+        except (FileNotFoundError, json.JSONDecodeError, OSError):
             print(f"[INFO - {self.client_name.upper()}] {client_name.upper()} Generating Device ID")
             characters = string.ascii_lowercase + string.digits
             device_id = ''.join(random.choice(characters) for _ in range(length))
@@ -412,27 +412,26 @@ class Client:
                     tmsid_dict[row['id']] = row
         else:
             print(f"[INFO - {self.client_name.upper()}] Opening TMSID via URL")
+            response = None
             session = requests.Session()
             try:
-                # print(f'[INFO - {self.client_name.upper()}] Call {local_client_name} Genre API')
                 response = session.get(tmsid_url, timeout=300)
             except requests.ConnectionError as e:
                 error = f"Connection Error. {str(e)}"
                 print(f'[ERROR - {self.client_name.upper()}] {error}')
                 print(f'[ERROR - {self.client_name.upper()}] Unable to access TMSID via {tmsid_url}') 
             finally:
-                # print(f'[INFO - {self.client_name.upper()}] Close {local_client_name} Genre API session')
                 session.close()
                 del session
                 gc.collect()
 
             # Check if request was successful
-            if response.status_code == 200:
+            if response is not None and response.status_code == 200:
                 # Read in the CSV data
                 reader = csv.DictReader(response.text.splitlines())
                 for row in reader:
                     tmsid_dict[row['id']] = row
-            else:
+            elif response is not None:
                 print(f'[ERROR - {self.client_name.upper()}] {response.status_code}: Unable to access TMSID Data.') 
 
         filtered_tmsid = {k: v for k, v in tmsid_dict.items() if v.get("tmsid")}
@@ -479,7 +478,10 @@ class Client:
                 return None, error
 
             genre_list = self.call_genre_api(local_headers)
-            if genre_list is None: return None
+            if genre_list is None:
+                error = f'[ERROR - {self.client_name.upper()}] Failed to retrieve genre list for {geo_code.upper()}'
+                print(error)
+                return None, error
 
             geo_genre = {geo_code: genre_list}
             genres.update(geo_genre)
@@ -496,7 +498,7 @@ class Client:
                     failure = False
                 else:
                     print(f'[INFO - {self.client_name.upper()}] No Token: Generate Token for {geo_code.upper()}')
-                    token_keychain = self.token({'regions': geo_code})
+                    token_keychain, _err = self.token({'regions': geo_code})
                     i += 1
             if failure: 
                 error = f'[INFO - {self.client_name.upper()}] No Token Located for {geo_code.upper()}'
@@ -718,6 +720,9 @@ class Client:
         del session
         gc.collect()
         
+        if has_error:
+            return None
+
         if response.status_code != 200:
             print(f'[ERROR - {self.client_name.upper()}] EPG HTTP Failure {response.status_code}')
             return None
@@ -740,6 +745,9 @@ class Client:
 
     def process_station(self, station, date, epg_channels):
         response_content = self.read_epg_from_api(date, epg_channels.get(station))
+        if response_content is None:
+            print(f"[ERROR - {self.client_name.upper()}] No EPG data returned for station {station} on {date}")
+            return
         modified_content = re.sub(r'<\?xml\s+version="1.0"\s*\?>', '', response_content)
 
         date_folder = Path(f"{self.data_path}/{date}")
@@ -968,10 +976,10 @@ class Client:
                 if file.is_file():
                     try:
                         file.unlink()
-                    except:
+                    except Exception:
                         print(f"[ERROR - {self.client_name.upper()}] Unable to delete {file}")
                     else:
-                        print(f"[ERROR - {self.client_name.upper()}] {file} Deleted")
+                        print(f"[INFO - {self.client_name.upper()}] {file} Deleted")
 
     def generate_epg_from_media_file(self, date, date_media_file, epg_channels):
         start_time = time.time()
