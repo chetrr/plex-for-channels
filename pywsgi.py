@@ -13,7 +13,7 @@ base_list = ['plex', 'freelivesports']
 # Fallback to default if invalid or unspecified
 try:
     port = int(os.environ.get("PORT", 7777))
-except:
+except (ValueError, TypeError):
     port = 7777
 
 
@@ -22,7 +22,7 @@ app = Flask(__name__)
 
 try:
     p_list = [item.lower() for item in (os.environ.get("PLIST")).split(',')]
-except:
+except (AttributeError, ValueError):
     p_list = base_list
 
 if len(p_list) == 0:
@@ -76,7 +76,7 @@ def index():
         body += '<div>'
         body_text = providers[provider].body_text(provider, host, geo_code_list)
         body += body_text
-        body += "</dev>"
+        body += "</div>"
     return f"{url_main}{body}</section></body></html>"
 
 @app.route("/<provider>/token")
