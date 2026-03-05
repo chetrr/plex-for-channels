@@ -749,6 +749,7 @@ class Client:
             print(f"[ERROR - {self.client_name.upper()}] No EPG data returned for station {station} on {date}")
             return
         modified_content = re.sub(r'<\?xml\s+version="1.0"\s*\?>', '', response_content)
+        modified_content = self.strip_illegal_characters(modified_content)
 
         date_folder = Path(f"{self.data_path}/{date}")
         filename = f"{station}_{date}.xml"
